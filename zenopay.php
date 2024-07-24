@@ -9,11 +9,19 @@ Text Domain: zenopay
 Domain Path: /languages
 */
 
-// Include the gateway class
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
+
 add_action('plugins_loaded', 'zenopay_gateway_init');
 
 function zenopay_gateway_init() {
-    if (!class_exists('WC_Payment_Gateway')) return;
+    if (!class_exists('WC_Payment_Gateway')) {
+        add_action('admin_notices', function() {
+            echo '<div class="error"><p>' . __('WooCommerce is not installed or activated. Please install and activate WooCommerce.', 'zenopay') . '</p></div>';
+        });
+        return;
+    }
 
     class WC_Gateway_ZenoPay extends WC_Payment_Gateway {
         public function __construct() {
@@ -31,9 +39,13 @@ function zenopay_gateway_init() {
             $this->title = $this->get_option('title');
             $this->description = $this->get_option('description');
             $this->account_id = $this->get_option('account_id');
+            $this->api_key = $this->get_option('api_key');
+            $this->secret_key = $this->get_option('secret_key');
 
-            // Debugging the account ID
+            // Debugging the account ID, api_key, and secret_key
             error_log('ZenoPay Account ID: ' . $this->account_id);
+            error_log('ZenoPay API Key: ' . $this->api_key);
+            // Avoid logging the secret_key for security reasons, handle it securely
 
             // Add action hooks
             add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
@@ -68,6 +80,20 @@ function zenopay_gateway_init() {
                     'default'     => '',
                     'desc_tip'    => true,
                 ),
+                'api_key' => array(
+                    'title'       => __('API Key', 'zenopay'),
+                    'type'        => 'text',
+                    'description' => __('Your ZenoPay API Key.', 'zenopay'),
+                    'default'     => '',
+                    'desc_tip'    => true,
+                ),
+                'secret_key' => array(
+                    'title'       => __('Secret Key', 'zenopay'),
+                    'type'        => 'password',
+                    'description' => __('Your ZenoPay Secret Key.', 'zenopay'),
+                    'default'     => '',
+                    'desc_tip'    => true,
+                ),
             );
         }
 
@@ -82,6 +108,8 @@ function zenopay_gateway_init() {
                 'buyer_phone'  => $order->get_billing_phone(),
                 'amount'       => $order->get_total(),
                 'account_id'   => $this->get_option('account_id'),
+                'api_key'      => $this->api_key,
+                'secret_key'   => $this->secret_key,
             );
 
             // Debugging the request data
